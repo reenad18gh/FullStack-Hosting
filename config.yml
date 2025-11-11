@@ -1,0 +1,43 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5.0.2
+  aws-cli: circleci/aws-cli@3.1.4
+
+jobs:
+  build:
+    docker:
+      - image: cimg/node:22.12
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Run backend tests
+          command: |
+            cd backend
+            npm install
+            npm test
+      - run:
+          name: Build frontend
+          command: |
+            cd frontend
+            npm install
+            npm run build
+      - aws-cli/setup:
+          profile-name: AWS
+      - run:
+          name: Deploy backend to Elastic Beanstalk
+          command: |
+            cd backend
+            zip -r deploy.zip .
+            aws elasticbeanstalk update-environment --application-name MyApp --environment-name MyApp-env --version-label new-version
+      - run:
+          name: Deploy frontend to S3
+          command: |
+            aws s3 sync ./frontend/dist s3://my-frontend-bucket --delete
+
+workflows:
+  version: 2
+  deploy:
+    jobs:
+      - build
